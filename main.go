@@ -1,6 +1,9 @@
 package main
 
 import (
+	"github.com/DoubleWB/game_demo/controller"
+	"github.com/DoubleWB/game_demo/model"
+	"github.com/DoubleWB/game_demo/view"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
@@ -9,8 +12,8 @@ import (
 
 func run() {
 	cfg := pixelgl.WindowConfig{
-		Title:  "Pixel Rocks!",
-		Bounds: pixel.R(0, 0, 1024, 768),
+		Title:  "Cutting Game Demo!",
+		Bounds: pixel.R(0, 0, 1000, 1000),
 		VSync:  true,
 	}
 
@@ -56,5 +59,13 @@ func run() {
 }
 
 func main() {
-	pixelgl.Run(run)
+
+	model := model.RestartModel()
+	view := view.View{}
+	controller := controller.Controller{
+		M: *model,
+		V: view,
+	}
+
+	pixelgl.Run(controller.RunGame)
 }

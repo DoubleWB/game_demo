@@ -1,0 +1,16 @@
+package util
+
+const BBOX_DIM = 500.0
+const BBOX_CORNERX = 250.0
+const BBOX_CORNERY = 250.0
+const EHP_CORNERX = 100.0
+const EHP_CORNERY = 800.0
+const HP_CORNERX = 600.0
+const HP_CORNERY = 100.0
+const TIMER_CORNERX = 100.0
+const TIMER_CORNERY = 250.0
+const BAR_WIDTH = 200.0
+const BAR_HEIGHT = 15.0
+const MAX_HP = 1000.0
+const CUTTER_SPEED = 5.0
+const ROTATE_SPEED = .05
