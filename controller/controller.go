@@ -29,6 +29,8 @@ func (c Controller) RunGame() {
 		win.Clear(colornames.Aliceblue)
 		c.V.DrawToWindow(win, c.M)
 		win.Update()
-		c.M.Update(win)
+		if !c.M.Update(win) {
+			return
+		}
 	}
 }

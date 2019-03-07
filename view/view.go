@@ -1,9 +1,14 @@
 package view
 
 import (
+	"fmt"
+
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
+	"github.com/faiface/pixel/text"
+	"golang.org/x/image/colornames"
+	"golang.org/x/image/font/basicfont"
 
 	"github.com/DoubleWB/game_demo/model"
 	"github.com/DoubleWB/game_demo/util"
@@ -84,13 +89,19 @@ func (v View) DrawToWindow(win *pixelgl.Window, m model.Model) {
 	})
 	timer.Rectangle(0)
 
-	cutter := m.Cutter.GetImage()
+	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
+	percent := text.New(pixel.V(util.PERCENT_CORNERX, util.PERCENT_CORNERY), atlas)
+	percent.Color = colornames.Black
+	fmt.Fprintln(percent, fmt.Sprintf("Error: %.2f", m.LastError))
+
+	cutter := m.Cutter.GetImage(true)
 	attack := m.CurrentAttack.GetImage()
 
 	//Write changes to canvas
 	bbox.Draw(win)
 	eHP.Draw(win)
 	HP.Draw(win)
+	percent.Draw(win, pixel.IM.Scaled(percent.Orig, 4))
 	timer.Draw(win)
 	attack.Draw(win)
 	cutter.Draw(win)

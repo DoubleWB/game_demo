@@ -9,6 +9,8 @@ import (
 	"github.com/faiface/pixel/pixelgl"
 )
 
+const CUT_SPAM_BUFFER = 30
+
 type Model struct {
 	CurrentAttack  Attack
 	Cutter         Cutter
@@ -16,27 +18,30 @@ type Model struct {
 	EnemyHP        float64
 	PlayerHP       float64
 	AttackTimer    float64
+	LastError      float64
 	cutterAngle    float64
+	cutSpamCount   int
 }
 
-func (m *Model) Update(win *pixelgl.Window) {
+func (m *Model) Update(win *pixelgl.Window) bool {
 	//Handle Cutter Changes
 	cdx := 0.0
 	cdy := 0.0
 	cdRot := 0.0
-	if win.Pressed(pixelgl.KeyLeft) {
+	currentPos := m.Cutter.GetPos()
+	if win.Pressed(pixelgl.KeyLeft) && (currentPos.X-util.CUTTER_SPEED > 0) {
 		cdx -= util.CUTTER_SPEED
 	}
 
-	if win.Pressed(pixelgl.KeyRight) {
+	if win.Pressed(pixelgl.KeyRight) && (currentPos.X+util.CUTTER_SPEED < util.BBOX_DIM) {
 		cdx += util.CUTTER_SPEED
 	}
 
-	if win.Pressed(pixelgl.KeyDown) {
+	if win.Pressed(pixelgl.KeyDown) && (currentPos.Y-util.CUTTER_SPEED > 0) {
 		cdy -= util.CUTTER_SPEED
 	}
 
-	if win.Pressed(pixelgl.KeyUp) {
+	if win.Pressed(pixelgl.KeyUp) && (currentPos.Y+util.CUTTER_SPEED < util.BBOX_DIM) {
 		cdy += util.CUTTER_SPEED
 	}
 
@@ -52,25 +57,30 @@ func (m *Model) Update(win *pixelgl.Window) {
 
 	m.Cutter.Update(cdx, cdy, math.Tan(m.cutterAngle))
 
-	hasCut := false
-
 	m.AttackTimer -= .008
-	if m.AttackTimer <= 0 || win.Pressed(pixelgl.KeySpace) {
-		hasCut = true
+	if m.AttackTimer <= 0 || win.Pressed(pixelgl.KeySpace) && m.cutSpamCount == CUT_SPAM_BUFFER {
+		//result is bounded by .5 and 0, .5 being the worst, and zero being the best
+		result := m.CurrentAttack.AcceptCut(m.Cutter)
+		m.LastError = result
+		enemyDamage := 300 * (.5 - result)
+		playerDamage := 300 * result
+		m.EnemyHP -= enemyDamage
+		m.PlayerHP -= playerDamage
+		m.cutSpamCount = 0
+
 		m.AttackTimer = 1.0
 		randRad := rand.Float64() * 40
 		randX := (rand.Float64() * (util.BBOX_DIM - (2 * randRad))) + randRad
 		randY := (rand.Float64() * (util.BBOX_DIM - (2 * randRad))) + randRad
 		m.CurrentAttack = NewStaticCircleAttack(m.BoundingCorner, pixel.Vec{X: randX, Y: randY}, randRad)
-	}
 
-	if hasCut {
-		result := m.CurrentAttack.AcceptCut(m.Cutter)
-		enemyDamage := 50 * result
-		playerDamage := 50 * (1.0 - result)
-		m.EnemyHP -= enemyDamage
-		m.PlayerHP -= playerDamage
+	} else if m.cutSpamCount < CUT_SPAM_BUFFER {
+		m.cutSpamCount++
 	}
+	if m.PlayerHP <= 0.0 || m.EnemyHP <= 0.0 {
+		return false
+	}
+	return true
 }
 
 func RestartModel() *Model {
@@ -86,5 +96,6 @@ func RestartModel() *Model {
 		PlayerHP:       1000.0,
 		AttackTimer:    1.0,
 		cutterAngle:    0.0,
+		cutSpamCount:   CUT_SPAM_BUFFER,
 	}
 }
