@@ -8,32 +8,34 @@ import (
 )
 
 type Cutter interface {
-	//Returns the image to draw this cutter
-	GetImage(withCenter bool) *imdraw.IMDraw
+	//Returns the image to draw this cutter. Fancy indicates that this is for a graphic presentation, and not cutting calculation,
+	//and boundingBox is the location of the bounding box of the play window, to adjust the drawing accordingly.
+	GetImage(fancy bool, boundingBox pixel.Vec) *imdraw.IMDraw
 	//Sets the cutter paramenters
 	Set(x, y, slope float64)
 	//Adds the given delta values to the cutter parameters
 	Update(x, y, slope float64)
 	//Returns the position of this cutter
 	GetPos() pixel.Vec
-	//Performs Cut
+	//Returns the slope of this cutter
+	GetSlope() float64
+	//Executes all actions associated with performing a cut
 	PerformCut()
 }
 
 type basicCutter struct {
-	boundingBox pixel.Vec
-	center      pixel.Vec
-	slope       float64
-	cutAnim     int
+	center  pixel.Vec
+	slope   float64
+	cutAnim int
 }
 
-func (b *basicCutter) GetImage(withCenter bool) *imdraw.IMDraw {
+func (b *basicCutter) GetImage(fancy bool, boundingBox pixel.Vec) *imdraw.IMDraw {
 	image := imdraw.New(nil)
-	if b.cutAnim > 0 && withCenter {
-		image.Color = pixel.RGB(1.0, 1.0, 0)
+	if b.cutAnim > 0 && fancy {
+		image.Color = util.CUTTER_ANIM_COLOR
 		b.cutAnim--
 	} else {
-		image.Color = pixel.RGB(0, 0, 0)
+		image.Color = util.CUTTER_COLOR
 	}
 
 	if b.slope != 0 {
@@ -55,42 +57,46 @@ func (b *basicCutter) GetImage(withCenter bool) *imdraw.IMDraw {
 			Y: (b.slope * (util.BBOX_DIM - b.center.X)) + b.center.Y,
 		}
 
+		//Go through all of the intercepts - if any of them are actually outside the window, we don't want to deal with them.
+		//The only case where this will not eliminate exactly 2 verts is a line that intersects the corners of the box,
+		//in which case the two intercepts at each corner are the same, so we don't care about drawing both of them.
 		intercepts := []pixel.Vec{xInt, yInt, xUpperInt, yUpperInt}
-
 		for _, intercept := range intercepts {
 			if intercept.X <= util.BBOX_DIM && intercept.X >= 0 && intercept.Y <= util.BBOX_DIM && intercept.Y >= 0 {
 				image.Push(pixel.Vec{
-					X: b.boundingBox.X + intercept.X,
-					Y: b.boundingBox.Y + intercept.Y,
+					X: boundingBox.X + intercept.X,
+					Y: boundingBox.Y + intercept.Y,
 				})
 			}
 		}
-	} else {
+	} else { // if the slope is zero, special case to avoid dividing by zero
 		image.Push((pixel.Vec{
-			X: b.boundingBox.X,
-			Y: b.boundingBox.Y + b.center.Y,
+			X: boundingBox.X,
+			Y: boundingBox.Y + b.center.Y,
 		}))
 		image.Push((pixel.Vec{
-			X: b.boundingBox.X + util.BBOX_DIM,
-			Y: b.boundingBox.Y + b.center.Y,
+			X: boundingBox.X + util.BBOX_DIM,
+			Y: boundingBox.Y + b.center.Y,
 		}))
 	}
 
 	//Draw cutter line
-	if b.cutAnim > 0 && withCenter {
-		image.Line(5.0)
+	if b.cutAnim > 0 && fancy {
+		image.Line(util.CUTTER_ANIM_THICK)
+	} else if fancy {
+		image.Line(util.CUTTER_IMAGE_THICK)
 	} else {
-		image.Line(2.0)
+		image.Line(util.CUTTER_THICK)
 	}
 
-	if withCenter {
+	if fancy {
 		adjustedCenter := pixel.Vec{
-			X: b.center.X + b.boundingBox.X,
-			Y: b.center.Y + b.boundingBox.Y,
+			X: b.center.X + boundingBox.X,
+			Y: b.center.Y + boundingBox.Y,
 		}
-		image.Color = pixel.RGB(0, .5, .5)
+		image.Color = util.CUTTER_CENTER_COLOR
 		image.Push(adjustedCenter)
-		image.Circle(5.0, 0)
+		image.Circle(util.CUTTER_CENTER_THICK, 0)
 	}
 
 	return image
@@ -112,8 +118,12 @@ func (b basicCutter) GetPos() pixel.Vec {
 	return b.center
 }
 
+func (b basicCutter) GetSlope() float64 {
+	return b.slope
+}
+
 func (b *basicCutter) PerformCut() {
-	b.cutAnim = 10
+	b.cutAnim = util.ANIM_FRAMES
 }
 
 func NewBasicCutter(boundingBox pixel.Vec) Cutter {
@@ -122,7 +132,6 @@ func NewBasicCutter(boundingBox pixel.Vec) Cutter {
 			X: util.BBOX_DIM / 2,
 			Y: util.BBOX_DIM / 2,
 		},
-		boundingBox: boundingBox,
-		slope:       0,
+		slope: 0,
 	}
 }

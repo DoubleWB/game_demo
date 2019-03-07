@@ -1,12 +1,9 @@
 package model
 
 import (
-	"math"
-
 	"github.com/DoubleWB/game_demo/util"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
-	"github.com/faiface/pixel/pixelgl"
 )
 
 const HALF1 = false
@@ -14,25 +11,24 @@ const HALF2 = true
 
 type Attack interface {
 	//Returns the image to draw this attack
-	GetImage() *imdraw.IMDraw
+	GetImage(boundingBox pixel.Vec) *imdraw.IMDraw
 	//Changes the image if it has some effect as a function of time
 	Update(timestep int)
-	//Accepts a cut from the given cutter object, and returns the ratio of the area of the halves from the cut
-	AcceptCut(Cutter) float64
+	//Returns true if this attack is in collision with the given cutter
+	InCollision(Cutter) bool
 }
 
 type staticCircleAttack struct {
-	boundingBox pixel.Vec
-	center      pixel.Vec
-	rad         float64
+	center pixel.Vec
+	rad    float64
 }
 
-func (s staticCircleAttack) GetImage() *imdraw.IMDraw {
+func (s staticCircleAttack) GetImage(boundingBox pixel.Vec) *imdraw.IMDraw {
 	image := imdraw.New(nil)
-	image.Color = pixel.RGB(1, 0, 0)
+	image.Color = util.ATTACK_COLOR
 	adjustedCenter := pixel.Vec{
-		X: s.center.X + s.boundingBox.X,
-		Y: s.center.Y + s.boundingBox.Y,
+		X: s.center.X + boundingBox.X,
+		Y: s.center.Y + boundingBox.Y,
 	}
 	image.Push(adjustedCenter)
 	image.Circle(s.rad, 0)
@@ -43,56 +39,79 @@ func (s staticCircleAttack) Update(timestep int) {
 	//Do not do anything, this is a static attack
 }
 
-func (s staticCircleAttack) AcceptCut(c Cutter) float64 {
-	fakeDraw := pixelgl.NewCanvas(pixel.R(0, 0, 1000, 1000))
-	s.GetImage().Draw(fakeDraw)
-	c.GetImage(false).Draw(fakeDraw)
-
-	halves := make(map[bool]int)
-
-	foundLine := false
-
-	for row := util.BBOX_CORNERY; row < util.BBOX_CORNERY+util.BBOX_DIM; row += 1 {
-		curHalf := HALF1
-		pixCount := 0
-		for x := util.BBOX_CORNERX; x < util.BBOX_CORNERX+util.BBOX_DIM; x += 1 {
-
-			pix := fakeDraw.Color(pixel.Vec{X: x, Y: row})
-
-			if pix == pixel.RGB(1.0, 0.0, 0.0) {
-				pixCount += 1
-			}
-
-			if pix == pixel.RGB(0.0, 0.0, 0.0) {
-				halves[curHalf] += pixCount
-				pixCount = 0
-				curHalf = HALF2
-				foundLine = true
-			}
-		}
-
-		//We didn't hit the line on this iteration
-		if curHalf == HALF1 {
-			if foundLine {
-				halves[HALF2] += pixCount
-			} else {
-				halves[HALF1] += pixCount
-			}
-		} else {
-			halves[HALF2] += pixCount
-		}
-	}
-
-	sum := halves[HALF1] + halves[HALF2]
-	c.PerformCut()
-
-	return math.Abs(float64(halves[HALF1])/float64(sum) - .5)
+//This attack is never in collision
+func (s staticCircleAttack) InCollision(c Cutter) bool {
+	return false
 }
 
-func NewStaticCircleAttack(center, boundingBox pixel.Vec, radius float64) Attack {
+func NewStaticCircleAttack(center pixel.Vec, radius float64) Attack {
 	return staticCircleAttack{
-		center:      center,
-		boundingBox: boundingBox,
-		rad:         radius,
+		center: center,
+		rad:    radius,
+	}
+}
+
+//Attack that also does collision damage
+type poisonCircleAttack struct {
+	center pixel.Vec
+	rad    float64
+}
+
+func (p poisonCircleAttack) GetImage(boundingBox pixel.Vec) *imdraw.IMDraw {
+	image := imdraw.New(nil)
+	image.Color = util.POISON_ATTACK_COLOR
+	adjustedCenter := pixel.Vec{
+		X: p.center.X + boundingBox.X,
+		Y: p.center.Y + boundingBox.Y,
+	}
+	image.Push(adjustedCenter)
+	image.Circle(p.rad, 0)
+	return image
+}
+
+func (p poisonCircleAttack) Update(timestep int) {
+	//Do not do anything, this is a static attack
+}
+
+func (p poisonCircleAttack) InCollision(c Cutter) bool {
+	distance := p.center.Sub(c.GetPos()).Len()
+	return distance <= p.rad
+}
+
+func NewPoisonCircleAttack(center pixel.Vec, radius float64) Attack {
+	return poisonCircleAttack{
+		center: center,
+		rad:    radius,
+	}
+}
+
+//Attack composed of an arbitrary number of other attacks
+type multiAttack struct {
+	attacks []Attack
+}
+
+func (m multiAttack) GetImage(boundingBox pixel.Vec) *imdraw.IMDraw {
+	image := imdraw.New(nil)
+	for _, a := range m.attacks {
+		a.GetImage(boundingBox).Draw(image)
+	}
+	return image
+}
+
+func (m multiAttack) Update(timestep int) {
+	//Do not do anything, this is a static attack
+}
+
+func (m multiAttack) InCollision(c Cutter) bool {
+	inCollision := false
+	for _, a := range m.attacks {
+		inCollision = inCollision || a.InCollision(c)
+	}
+	return inCollision
+}
+
+func NewMultiAttack(attacks []Attack) Attack {
+	return multiAttack{
+		attacks: attacks,
 	}
 }
