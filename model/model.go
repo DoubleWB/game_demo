@@ -23,6 +23,39 @@ type Model struct {
 	cutSpamCount   int
 }
 
+func (m *Model) updateCutterMouse(win *pixelgl.Window) {
+	//Handle Cutter Changes
+	if win.MouseInsideWindow() {
+		if win.Pressed(pixelgl.MouseButtonLeft) {
+			curPos := m.Cutter.GetPos()
+			newPos := win.MousePosition()
+			slopeNum := (newPos.Y - util.BBOX_CORNERY) - (curPos.Y)
+			slopeDenom := (newPos.X - util.BBOX_CORNERX) - (curPos.X)
+			if slopeDenom != 0 {
+				newSlope := slopeNum / slopeDenom
+				m.Cutter.Set(curPos.X, curPos.Y, newSlope)
+			}
+		} else {
+			curPos := win.MousePosition()
+			newX := curPos.X - util.BBOX_CORNERX
+			newY := curPos.Y - util.BBOX_CORNERY
+			if newX > util.BBOX_DIM {
+				newX = util.BBOX_DIM
+			}
+			if newX < 0 {
+				newX = 0
+			}
+			if newY > util.BBOX_DIM {
+				newY = util.BBOX_DIM
+			}
+			if newY < 0 {
+				newY = 0
+			}
+			m.Cutter.Set(newX, newY, m.Cutter.GetSlope())
+		}
+	}
+}
+
 func (m *Model) updateCutter(win *pixelgl.Window) {
 	//Handle Cutter Changes
 	cdx := 0.0
@@ -166,7 +199,7 @@ func (m *Model) Update(win *pixelgl.Window) {
 
 	if !m.HasLost && !m.HasWon {
 
-		m.updateCutter(win)
+		m.updateCutterMouse(win)
 
 		m.handleCollision()
 
