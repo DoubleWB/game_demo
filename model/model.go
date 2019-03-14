@@ -199,7 +199,8 @@ func (m *Model) Update(win *pixelgl.Window) {
 
 	if !m.HasLost && !m.HasWon {
 
-		m.updateCutterMouse(win)
+		//m.updateCutterMouse(win)
+		m.updateCutter(win)
 
 		m.handleCollision()
 
